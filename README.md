@@ -4,6 +4,11 @@
 
    ```bash
    docker pull ghcr.io/l3yx/sandbox:latest
+   docker tag ghcr.io/l3yx/sandbox:latest l3yx/sandbox:latest
+   
+   # 或者使用加速地址:
+   # docker pull ghcr.nju.edu.cn/l3yx/sandbox:latest
+   # docker tag ghcr.nju.edu.cn/l3yx/sandbox:latest l3yx/sandbox:latest
    ```
 
 2. 创建.env文件并填入LLM Key：

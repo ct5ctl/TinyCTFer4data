@@ -7,7 +7,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 
 class Ctfer:
     def __init__(self, vnc_port, workspace):
-        self.image = "ghcr.io/l3yx/sandbox:latest"
+        self.image = "l3yx/sandbox:latest"
         self.volumes = [
             f"{SCRIPT_DIR/'claude_code'}:/opt/claude_code:ro",
             f"{workspace}:/home/ubuntu/Workspace"
