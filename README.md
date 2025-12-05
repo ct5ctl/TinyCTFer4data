@@ -23,16 +23,20 @@ PPT：https://wiki.chainreactors.red/blog/2025/12/01/intent_is_all_you_need/
    # docker tag ghcr.nju.edu.cn/l3yx/sandbox:latest l3yx/sandbox:latest
    ```
 
-2. 创建.env文件并填入LLM Key：
+2. 创建.env文件并填入LLM Key（这里可以使用任意厂商的 Anthropic 兼容 api ）：
 
    ```
    cp .env.example .env
    ```
 
-   这里可以使用任意厂商的 Anthropic 兼容 api （可以提前使用以下命令检查 api 和 key 的可用性，如果不可用的话直接启动 tinyctfer.py 会无响应很久（Claude Code 设计问题，会一直重试连接））
+   
+
+   可以提前使用以下命令进入容器检查 api 和 key 的可用性，如果不可用的话直接启动 tinyctfer.py 会无响应很久（Claude Code 设计问题，会一直重试连接）
 
    ```
-   ANTHROPIC_MODEL=GLM-4.6 ANTHROPIC_BASE_URL=https://open.bigmodel.cn/api/anthropic ANTHROPIC_AUTH_TOKEN=xxx claude 你好
+   docker run --rm -ti --entrypoint bash l3yx/sandbox:latest
+   
+   ANTHROPIC_MODEL=GLM-4.6 ANTHROPIC_BASE_URL=https://open.bigmodel.cn/api/anthropic ANTHROPIC_AUTH_TOKEN=xxx claude hello
    ```
 
 3. 指定CTF题目地址和工作目录，启动：
