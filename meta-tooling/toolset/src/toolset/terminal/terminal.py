@@ -2,12 +2,50 @@ import subprocess
 import psutil
 import os
 import time
-from typing import Annotated, Optional
+from typing import Annotated, Optional, Dict, Any
 import libtmux
+import json
+from datetime import datetime
+from pathlib import Path
 
 from core import tool, toolset, namespace
 
 namespace()
+
+LOG_DIR = os.path.join(Path.home(), "Workspace/logs")
+LOG_FILE = os.path.join(LOG_DIR, "steps.jsonl")
+
+
+def _append_log(entry: Dict[str, Any]) -> None:
+    """
+    Append a JSON line to the shared step log.
+    保证每条都有 ts / action / observation 字段。
+    """
+    if os.getenv("DISABLE_STEP_LOG"):
+        return
+    # 填充必备字段，避免缺失
+    entry.setdefault("ts", datetime.utcnow().isoformat() + "Z")
+    entry.setdefault("action", "")
+    entry.setdefault("observation", "")
+
+    os.makedirs(LOG_DIR, exist_ok=True)
+    with open(LOG_FILE, "a", encoding="utf-8") as f:
+        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+
+def _log_terminal_event(event: str, session_id: int, action: str, observation: str) -> None:
+    """
+    统一的终端事件日志封装。
+    每条记录至少包含: ts, action, observation，再附带 event / session_id / tag。
+    """
+    entry: Dict[str, Any] = {
+        "tag": "terminal",
+        "event": event,
+        "session_id": str(session_id),
+        "action": action,
+        "observation": observation,
+    }
+    _append_log(entry)
 
 @toolset()
 class Terminal:
@@ -29,6 +67,13 @@ class Terminal:
             return f"No session found with id: {session_id}. Here are session ids: {', '.join(session_ids)}"
         session = sessions[0]
         session.kill()
+        # 这里 action 记录高层语义，observation 简单说明
+        _log_terminal_event(
+            event="kill_session",
+            session_id=session_id,
+            action=f"kill_session(id={session_id})",
+            observation="session killed",
+        )
 
     @tool()
     def new_session(self) -> int:
@@ -45,6 +90,12 @@ class Terminal:
             else:
                 time.sleep(0.5)
             session.set_option('destroy-unattached', 'on')
+        _log_terminal_event(
+            event="new_session",
+            session_id=int(session_id),
+            action=f"new_session(start_directory=/home/ubuntu/Workspace)",
+            observation=f"created session {session_id}",
+        )
         return int(session_id)
 
     @tool()
@@ -60,7 +111,14 @@ class Terminal:
         if not sessions:
             return f"No session found with id: {session_id}. Here are session ids: {', '.join(session_ids)}"
         session = sessions[0]
-        return '\n'.join(session.windows[0].panes[0].capture_pane(start, end))
+        output = '\n'.join(session.windows[0].panes[0].capture_pane(start, end))
+        _log_terminal_event(
+            event="get_output",
+            session_id=session_id,
+            action=f"get_output(start={start!r}, end={end!r})",
+            observation=output,
+        )
+        return output
 
     @tool()
     def send_keys(self, session_id: int, keys: Annotated[str,"Text or input into terminal window"], enter: Annotated[bool,"Send enter after sending the input."]) -> str:
@@ -104,5 +162,14 @@ class Terminal:
         session = sessions[0]
         session.windows[0].panes[0].send_keys(keys, enter=enter)
         time.sleep(1)
-        return '\n'.join(session.windows[0].panes[0].capture_pane())
+        output = '\n'.join(session.windows[0].panes[0].capture_pane())
+        # 这里 action = 实际执行的命令（含是否自动加回车）
+        cmd_desc = keys if enter else f"{keys} (no-enter)"
+        _log_terminal_event(
+            event="send_keys",
+            session_id=session_id,
+            action=cmd_desc,
+            observation=output,
+        )
+        return output
 

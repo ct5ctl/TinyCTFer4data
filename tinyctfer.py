@@ -30,7 +30,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 
 class Ctfer:
     """CTF Solver Runtime - Provide AI maximum freedom within safe container boundary"""
-    def __init__(self, vnc_port, workspace):
+    def __init__(self, vnc_port, workspace, proxy_host=None, proxy_port=None):
         # Sandbox: Ubuntu desktop + Claude Code + Python Executor MCP + Toolset + Security tools
         self.image = "l3yx/sandbox:latest"
         self.volumes = [
@@ -43,6 +43,31 @@ class Ctfer:
             "ANTHROPIC_MODEL": os.getenv("ANTHROPIC_MODEL"),
             "NO_CODESERVER": "true"
         }
+        
+        # Configure proxy if provided
+        if proxy_host and proxy_port:
+            proxy_url = f"http://{proxy_host}:{proxy_port}"
+            self.environment.update({
+                "http_proxy": proxy_url,
+                "https_proxy": proxy_url,
+                "HTTP_PROXY": proxy_url,
+                "HTTPS_PROXY": proxy_url,
+                "GIT_SSH_COMMAND": f"ssh -o ProxyCommand='nc -x {proxy_host}:{proxy_port} %h %p'"
+            })
+            print(f"[+] 已配置代理: {proxy_url}")
+        elif os.getenv("PROXY_HOST") and os.getenv("PROXY_PORT"):
+            # Fallback to environment variables
+            proxy_host = os.getenv("PROXY_HOST")
+            proxy_port = os.getenv("PROXY_PORT")
+            proxy_url = f"http://{proxy_host}:{proxy_port}"
+            self.environment.update({
+                "http_proxy": proxy_url,
+                "https_proxy": proxy_url,
+                "HTTP_PROXY": proxy_url,
+                "HTTPS_PROXY": proxy_url,
+                "GIT_SSH_COMMAND": f"ssh -o ProxyCommand='nc -x {proxy_host}:{proxy_port} %h %p'"
+            })
+            print(f"[+] 已配置代理（从环境变量）: {proxy_url}")
         self.ports = {f"{vnc_port}":"5901"}  # VNC for human observation
         self.docker_client = docker.DockerClient()
         self.container = None
@@ -72,11 +97,15 @@ if __name__ == "__main__":
     parser.add_argument('--ctf', type=str, required=True, help='CTF challenge URL')
     parser.add_argument('--vnc-port', type=int, default=5901, help='VNC port (default: 5901)')
     parser.add_argument('--workspace', type=str, default="workspace", help='Workspace directory (default: workspace)')
+    parser.add_argument('--proxy-host', type=str, default=None, help='Proxy host (e.g., 192.168.121.171). Can also be set via PROXY_HOST env var.')
+    parser.add_argument('--proxy-port', type=int, default=None, help='Proxy port (e.g., 7890). Can also be set via PROXY_PORT env var.')
 
     args = parser.parse_args()
     ctf = args.ctf
     vnc_port = args.vnc_port
     workspace = os.path.abspath(args.workspace)
+    proxy_host = args.proxy_host or os.getenv("PROXY_HOST")
+    proxy_port = args.proxy_port or (int(os.getenv("PROXY_PORT")) if os.getenv("PROXY_PORT") else None)
 
     task = f'''
     Use the security-ctf-agent: Solve the CTF challenge (obtaining the Flag completes the task, you can end work immediately, don't need to verify the flag's accuracy.)
@@ -88,7 +117,7 @@ if __name__ == "__main__":
     '''.strip()
 
     print("[+] 启动沙盒...")
-    ctfer = Ctfer(vnc_port, workspace)
+    ctfer = Ctfer(vnc_port, workspace, proxy_host=proxy_host, proxy_port=proxy_port)
     print("[+] 等待沙盒环境和mcp服务就绪...")
     ctfer.container.exec_run(["bash","wait.sh"], workdir="/opt/claude_code")
     print("[+] mcp服务已就绪...")

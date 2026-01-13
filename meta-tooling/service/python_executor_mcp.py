@@ -2,8 +2,11 @@ import time
 import os
 import re
 import argparse
+import json
 from typing import Annotated, Optional
 from queue import Empty
+from datetime import datetime
+from pathlib import Path
 import nbformat
 from jupyter_client import KernelManager
 from nbformat import v4 as nbf
@@ -14,6 +17,10 @@ class PythonExecutor:
         self.path = path
         self.sessions = {}
         os.makedirs(self.path, exist_ok=True)
+        # Setup logging directory
+        self.log_dir = os.path.join(Path.home(), "Workspace/logs")
+        self.log_file = os.path.join(self.log_dir, "steps.jsonl")
+        os.makedirs(self.log_dir, exist_ok=True)
 
     def _sanitize_filename(self, name):
         name = re.sub(r'[^\w\-.]', '_', name)
@@ -85,6 +92,77 @@ class PythonExecutor:
                 })   
         return formatted_outputs
 
+    def _get_code_summary(self, code: str, max_length: int = 200) -> str:
+        """Extract a brief summary of the code for logging."""
+        lines = code.strip().split('\n')
+        if len(lines) == 1:
+            return lines[0][:max_length]
+        # Get first meaningful line (skip comments/imports if possible)
+        for line in lines[:5]:
+            stripped = line.strip()
+            if stripped and not stripped.startswith('#') and not stripped.startswith('import'):
+                return stripped[:max_length]
+        # Fallback: first line
+        return lines[0][:max_length]
+
+    def _format_observation(self, output_objects) -> str:
+        """Format execution outputs into a readable observation string."""
+        if not output_objects:
+            return "Code executed successfully, no output."
+        
+        parts = []
+        for out in output_objects:
+            output_type = out.output_type
+            if output_type == 'stream':
+                text = out.text.strip()
+                if text:
+                    parts.append(f"[{out.name}]: {text[:500]}")  # Limit length
+            elif output_type == 'execute_result':
+                data = dict(out.data)
+                # Try to get text representation
+                if 'text/plain' in data:
+                    parts.append(f"[result]: {str(data['text/plain'])[:500]}")
+                else:
+                    parts.append(f"[result]: {str(data)[:500]}")
+            elif output_type == 'error':
+                parts.append(f"[ERROR]: {out.ename}: {out.evalue}")
+                if out.traceback:
+                    tb = '\n'.join(out.traceback[-3:])  # Last 3 lines of traceback
+                    parts.append(f"[traceback]: {tb[:500]}")
+        
+        observation = '\n'.join(parts)
+        # Limit total length
+        if len(observation) > 2000:
+            observation = observation[:2000] + "... (truncated)"
+        return observation
+
+    def _log_code_execution(self, session_name: str, code: str, output_objects: list, execution_time: float):
+        """Automatically log code execution details."""
+        if os.getenv("DISABLE_STEP_LOG"):
+            return
+        
+        code_summary = self._get_code_summary(code)
+        observation = self._format_observation(output_objects)
+        
+        entry = {
+            "ts": datetime.utcnow().isoformat() + "Z",
+            "tag": "code_execution",
+            "event": "execute_code",
+            "session_name": session_name,
+            "action": code_summary,
+            "observation": observation,
+            "execution_time_seconds": round(execution_time, 2),
+            "code_length": len(code),
+            "has_error": any(out.output_type == 'error' for out in output_objects)
+        }
+        
+        try:
+            with open(self.log_file, "a", encoding="utf-8") as f:
+                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        except Exception as e:
+            # Silently fail logging to avoid breaking execution
+            pass
+
     def list_sessions(self):
         return list(self.sessions.keys())
 
@@ -109,6 +187,7 @@ class PythonExecutor:
         
         output_objects = []
         start_time = time.time()
+        execution_start = start_time
 
         try:
             shell_reply_received = False
@@ -181,6 +260,10 @@ class PythonExecutor:
             nbformat.write(notebook, f)
 
         session['execution_count'] += 1
+        
+        # Auto-log code execution details
+        execution_time = time.time() - execution_start
+        self._log_code_execution(session_name, code, output_objects, execution_time)
 
         return self._format_output(output_objects)
 

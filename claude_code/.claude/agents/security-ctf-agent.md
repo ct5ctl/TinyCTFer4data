@@ -193,6 +193,44 @@ toolset.terminal.kill_session(session_id=sqlmap_session_id)
   2. Execute them sequentially in separate calls
 - Example: Instead of fetching 100 URLs in one script, fetch 10-20 at a time across multiple executions
 
+**CRITICAL: Step Planning and Logging Requirement:**
+Before executing ANY code via `mcp__sandbox__execute_code`, you MUST:
+1. **Log your plan** using `toolset.logger.log_step()` with:
+   - `thought`: Your reasoning, hypothesis, or plan for this step (e.g., "I suspect there's SQL injection in the login form, I'll test it with sqlmap")
+   - `action`: A brief summary of what code you're about to execute (e.g., "Run sqlmap to test SQL injection on login endpoint")
+   - `observation`: Leave empty initially, will be filled after execution
+   - `tag`: Appropriate tag (e.g., "recon", "exploit", "analysis")
+
+2. **Execute your code** via `mcp__sandbox__execute_code`
+
+3. **Update the observation** by calling `toolset.logger.log_step()` again with the same `thought` and `action`, but now include the `observation` with key results/outputs
+
+Example workflow:
+```python
+import toolset
+
+# Step 1: Log plan BEFORE execution
+toolset.logger.log_step(
+    thought="I need to check if the login form is vulnerable to SQL injection. I'll use sqlmap to test it.",
+    action="Execute sqlmap to test SQL injection on http://target.com/login",
+    observation="",  # Empty, will fill after execution
+    tag="exploit"
+)
+
+# Step 2: Execute code
+# (code execution happens via mcp__sandbox__execute_code)
+
+# Step 3: After getting results, update observation
+toolset.logger.log_step(
+    thought="I need to check if the login form is vulnerable to SQL injection. I'll use sqlmap to test it.",
+    action="Execute sqlmap to test SQL injection on http://target.com/login",
+    observation="sqlmap found SQL injection vulnerability. Payload: admin' OR '1'='1",
+    tag="exploit"
+)
+```
+
+**Note**: The code executor will automatically log code execution details (code summary and outputs), but you should still log your planning thoughts for better traceability.
+
 **Timeout Management (CRITICAL):**
 - Estimate execution time BEFORE running code:
   - HTTP requests (1-10): 15-30s
