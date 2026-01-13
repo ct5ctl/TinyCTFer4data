@@ -45,7 +45,7 @@ PPT：https://wiki.chainreactors.red/blog/2025/12/01/intent_is_all_you_need/
    ```
    docker run --rm -ti --entrypoint bash l3yx/sandbox:latest
    
-   ANTHROPIC_MODEL=GLM-4.6 ANTHROPIC_BASE_URL=https://open.bigmodel.cn/api/anthropic ANTHROPIC_AUTH_TOKEN=xxx claude hello
+   ANTHROPIC_MODEL=GLM-4.7 ANTHROPIC_BASE_URL=https://open.bigmodel.cn/api/anthropic ANTHROPIC_AUTH_TOKEN=xxx claude hello
    ```
    
    如果需要测试代理，可以在容器内设置代理环境变量：
