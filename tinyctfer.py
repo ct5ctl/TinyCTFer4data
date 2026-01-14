@@ -68,7 +68,7 @@ class Ctfer:
                 "GIT_SSH_COMMAND": f"ssh -o ProxyCommand='nc -x {proxy_host}:{proxy_port} %h %p'"
             })
             print(f"[+] 已配置代理（从环境变量）: {proxy_url}")
-        self.ports = {f"{vnc_port}":"5901"}  # VNC for human observation
+        self.ports = {"5901/tcp": vnc_port}  # VNC for human observation
         self.docker_client = docker.DockerClient()
         self.container = None
         try:
