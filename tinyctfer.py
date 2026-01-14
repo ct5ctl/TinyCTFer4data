@@ -68,7 +68,7 @@ class Ctfer:
                 "GIT_SSH_COMMAND": f"ssh -o ProxyCommand='nc -x {proxy_host}:{proxy_port} %h %p'"
             })
             print(f"[+] 已配置代理（从环境变量）: {proxy_url}")
-        self.ports = {"5901/tcp": vnc_port}  # VNC for human observation
+        self.ports = {f"{vnc_port}":"5905"}  # VNC for human observation
         self.docker_client = docker.DockerClient()
         self.container = None
         try:
@@ -95,7 +95,7 @@ if __name__ == "__main__":
     # Main Entry Point: The 100-line Baby Runtime in Action
     parser = argparse.ArgumentParser(description='CTF Challenge Solver')
     parser.add_argument('--ctf', type=str, required=True, help='CTF challenge URL')
-    parser.add_argument('--vnc-port', type=int, default=5901, help='VNC port (default: 5901)')
+    parser.add_argument('--vnc-port', type=int, default=5905, help='VNC port (default: 5905)')
     parser.add_argument('--workspace', type=str, default="workspace", help='Workspace directory (default: workspace)')
     parser.add_argument('--proxy-host', type=str, default=None, help='Proxy host (e.g., 192.168.121.171). Can also be set via PROXY_HOST env var.')
     parser.add_argument('--proxy-port', type=int, default=None, help='Proxy port (e.g., 7890). Can also be set via PROXY_PORT env var.')
